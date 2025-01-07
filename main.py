@@ -17,22 +17,11 @@ data_df = pd.read_csv('train.csv')
 test_df = pd.read_csv('test.csv')
 
 data_df.columns
-
 test_df.columns
 
-
-
 data_df.fillna(0,inplace=True)
-
-
 test_df.fillna(0,inplace=True)
-
-data_df
-
-test_df
 data_df['Label'].value_counts()
-
-
 
 X_columns = [
     'ID', 'flow_duration', 'Header_Length', 'Protocol type', 'Duration',
@@ -47,8 +36,6 @@ X_columns = [
 
 # DF column used for the attack labels
 y_column = 'Label'
-
-
 
 # Creating a dictionary of attack types for 33 attack classes + 1 for benign traffic
 dict_34_classes = {'BenignTraffic': 0 ,                                                                                                                         # Benign
@@ -80,20 +67,14 @@ data_df['Label'] = data_df['Label'].map(dict_2_classes)
 num_unique_classes = len(data_df[y_column].unique())
 print("unique classess: ", num_unique_classes)
 
-
-
-
 scaler = StandardScaler()
 data_df[X_columns] = scaler.fit_transform(data_df[X_columns])
 test_df[X_columns] = scaler.fit_transform(test_df[X_columns])
-
-
 
 print("Data 1 size: {}".format(data_df.shape))
 print(data_df.info())
 print("Test 1 size: {}".format(test_df.shape))
 print(test_df.info())
-
 
 data_df['Label'].value_counts()
 
@@ -103,10 +84,7 @@ data_df["Label"].value_counts()
 
 
 # TRAIN MODEL
-
 # # Create model Xgboost
-
-
 X = data_df[X_columns]
 y = data_df[y_column]
 
@@ -116,7 +94,6 @@ print("X_train: ", X_train.shape)
 print("X_test: ", X_test.shape)
 print("y_train: ", y_train.shape)
 print("y_test: ", y_test.shape)
-
 
 # Train the model
 model = xgb.XGBClassifier()
@@ -135,7 +112,6 @@ print("Done")
 
 
 # # Turnning Hyperparameter
-
 def timer(start_time=None):
     if not start_time:
         start_time = datetime.now()
@@ -180,74 +156,53 @@ print(random_search.best_params_)
 results = pd.DataFrame(random_search.cv_results_)
 results.to_csv('xgb-random-grid-search-results-01.csv', index=False)
 
-
-# Tạo DMatrix từ dữ liệu 
 dtrain = xgb.DMatrix(X_train, label=y_train) 
-# Tạo hàm để in ra độ chính xác qua từng vòng lặp 
 evals_result = {} 
-#def custom_eval(preds, dtrain): 
- #   labels = dtrain.get_label() 
-    #preds_labels = [1 if y > 0.5 else 0 for y in preds] 
-  #  accuracy = accuracy_score(labels, preds) 
-   # logloss = log_loss(labels, preds) 
-   # return [('accuracy', accuracy), ('test_logloss', logloss)]
-# Đặt tham số 
+def custom_eval(preds, dtrain): 
+    labels = dtrain.get_label() 
+    preds_labels = [1 if y > 0.5 else 0 for y in preds] 
+    accuracy = accuracy_score(labels, preds_labels) 
+    logloss = log_loss(labels, preds_labels) 
+    return [('accuracy', accuracy), ('test_logloss', logloss)]
+
 param = { 'objective': 'binary:logistic', 'subsample': 0.8, 'min_child_weight': 5, 'max_depth': 5, 'gamma': 1, 'colsample_bytree': 0.8 } 
-# Huấn luyện mô hình 
-fmodel = xgb.train(param, dtrain, num_boost_round=100)
-      
-# Huấn luyện mô hình và sử dụng hàm custom_eval để in ra kết quả
-#fmodel = xgb.train(param, dtrain, num_boost_round=100, evals=[(dtrain, 'train')], evals_result=evals_result, verbose_eval=True, early_stopping_rounds = 30, custom_metric=custom_eval)
+
+fmodel = xgb.train(param, dtrain, num_boost_round=100, evals=[(dtrain, 'train')], evals_result=evals_result, verbose_eval=True, early_stopping_rounds = 30, custom_metric=custom_eval)
 
 
-# Tạo DMatrix từ tập kiểm tra 
+
 dtest = xgb.DMatrix(X_test, label=y_test) 
-# Dự đoán kết quả 
 fy_pred = fmodel.predict(dtest) 
 fy_pred = [1 if y > 0.5 else 0 for y in fy_pred] 
-# Ngưỡng 0.5 để phân loại # Tính Accuracy 
 faccuracy = accuracy_score(y_test, fy_pred) 
 print("Training Accuracy:", faccuracy * 100 , "%") 
-# Tính F1-score 
 ff1_score = f1_score(y_test, fy_pred) 
 print("Training F1 Score:", ff1_score * 100 , "%") 
 
 
 f1_test = xgb.DMatrix(test_df)
-
-# Dự đoán kết quả 
 f1_pred = fmodel.predict(f1_test)
 
 
 
 f1_pred = [1 if y > 0.5 else 0 for y in fy_pred] 
-# Ngưỡng 0.5 để phân loại # Tính Accuracy 
 f1accuracy = accuracy_score(y_test, f1_pred) 
 print("Validate Accuracy:", f1accuracy * 100 , "%") 
-# Tính F1-score 
 f1f1_score = f1_score(y_test, f1_pred) 
 print("Validate F1 Score:", f1f1_score * 100 , "%") 
 
-
-
 # Save the trained model
 fmodel.save_model('model/bestf1.json')
-
 
 # Load the saved model
 loaded_model = xgb.XGBClassifier()
 loaded_model.load_model('model/bestf1.json')
 
-
-
 t_pred = loaded_model.predict(test_df)
 
-
 t_pred = [1 if y > 0.5 else 0 for y in fy_pred] 
-# Ngưỡng 0.5 để phân loại # Tính Accuracy 
 taccuracy = accuracy_score(y_test, t_pred) 
-print("Test Accuracy:", taccuracy * 100 , "%") 
-# Tính F1-score 
+print("Loaded model Accuracy:", taccuracy * 100 , "%") 
 tf1_score = f1_score(y_test, t_pred) 
-print("Test F1 Score:", tf1_score * 100 , "%") 
+print("Loaded model F1 Score:", tf1_score * 100 , "%") 
 
